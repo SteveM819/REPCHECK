@@ -286,7 +286,7 @@ h1.screen{font-size:23px; font-weight:800; margin:6px 4px 14px;
 /* IMPORTANT: the storage key keeps its historical name so every byte of
    existing data survives the rename. Renaming the key = losing the data. */
 const STORE_KEY = "atlasos_v1";
-const VERSION   = "0.5.0";
+const VERSION   = "0.5.1";
 const CATS = ["chest","back","shoulders","arms","legs","abs","cardio","other"];
 const SKIP_REASONS = ["busy","pain","time","fatigue","other"];
 const CARDIO_TYPES = ["run","row","stair","other"];
@@ -796,11 +796,28 @@ function createExerciseSave(){
   if(pickCb) pickCb(id);
 }
 
+let pendingReasonCb = null;
 function pickReason(cb, title){
+  pendingReasonCb = cb;
   openModal(`<h3>${esc(title)}</h3>
     <div class="reasons">${SKIP_REASONS.map(r=>
-      `<button class="btn secondary" onclick="closeModal(); (${cb})('${r}')">${r}</button>`).join("")}
+      r==="other"
+        ? `<button class="btn secondary" onclick="pickReasonOther()">${r}</button>`
+        : `<button class="btn secondary" onclick="closeModal(); (${cb})('${r}')">${r}</button>`
+    ).join("")}
     </div>`);
+}
+function pickReasonOther(){
+  openModal(`<h3>What happened?</h3>
+    <input class="textbox" id="reasonothertxt" placeholder="e.g. shoulder was sore">
+    <div style="height:14px"></div>
+    <button class="btn" onclick="submitReasonOther()">Save</button>`);
+}
+function submitReasonOther(){
+  const txt = document.getElementById("reasonothertxt").value.trim();
+  const cb = pendingReasonCb;
+  closeModal();
+  if(cb) eval(cb)(txt ? "other: "+txt : "other");
 }
 
 /* ---------- 7. SCREENS ---------- */
@@ -959,7 +976,10 @@ function TodayScreen(){
       <div class="metric"><label>Sleep h</label>
         <input type="number" inputmode="decimal" step="0.5" placeholder="—" onfocus="this.select()"
           value="${met.sleepHours ?? ""}" onchange="setMetric('sleepHours', this.value)"></div>
-    </div></div>`;
+    </div>
+    <input class="textbox" style="margin-top:8px; width:100%; box-sizing:border-box" placeholder="Notes for today (optional)"
+      value="${esc(met.notes ?? "")}" onchange="setMetricNote(this.value)">
+    </div>`;
 
   /* -- other sessions + last session -- */
   h += `<div class="card"><h2>Start another session</h2>
@@ -1022,10 +1042,16 @@ function SessionScreen(){
       const lastTxt = last
         ? "Last: " + last.entry.sets.map(s=>(s.isWarmup?"w":"")+fmtW(s.weightKg)+"×"+s.reps).join("  ")
         : "First time logging this";
+      const rec = recordsFor(en.exerciseId);
+      const liveDelta = deltaFor(en.exerciseId, en.sets, null);
+      const bestTxt = rec.bestW
+        ? `Best: ${fmtW(rec.bestW.v)}×${rec.bestW.reps}${liveDelta ? ` <span class="delta ${liveDelta.cls}">${liveDelta.label}</span>` : ""}`
+        : "";
       h += `<div class="exblock"><div class="spread">
         <div><div class="exname" onclick="openEx('${en.exerciseId}','session')">${esc(ex?.name ?? "?")}
           ${en.rr?`<span class="lastline" style="display:inline"> · target ${esc(en.rr)}</span>`:""}</div>
         <div class="lastline">${esc(lastTxt)}</div>
+        ${bestTxt ? `<div class="lastline">${bestTxt}</div>` : ""}
         ${ex && ex.note ? `<div class="noteline">✎ ${esc(ex.note)}</div>` : ""}</div>
         <span class="row" style="gap:6px; flex:none">
           <button class="chipbtn" onclick="checkAll(${ei})">✓ all ⏱</button>
@@ -1289,6 +1315,16 @@ function tDelete(){
 /* ----- HISTORY: gym + cardio, colour-coded, one timeline ----- */
 function HistoryScreen(){
   let h = `<h1 class="screen">History</h1>`;
+  const notedMetrics = [...S.dailyMetrics].filter(m=>m.notes).sort((a,b)=>b.date.localeCompare(a.date));
+  if(notedMetrics.length){
+    h += `<div class="card"><h2>Daily notes</h2>
+    ${notedMetrics.map(m=>`<div class="factrow"><span class="lastline">${m.date}</span>
+      <span class="row" style="gap:8px; align-items:center">
+        <span>${esc(m.notes)}</span>
+        <button class="chipbtn" style="color:var(--down)" onclick="delMetricNote('${m.date}')">✕</button>
+      </span></div>`).join("")}
+    </div>`;
+  }
   const items = [
     ...S.sessions.map(s=>({kind:"gym", date:s.date, id:s.id, data:s})),
     ...S.cardio.map(c=>({kind:"cardio", date:c.date, id:c.id, data:c})),
@@ -1432,6 +1468,16 @@ function setMetric(field, val){
   const m = metricsFor(todayISO());
   const n = Number(val);
   m[field] = val==="" || isNaN(n) ? null : Math.max(0, n);
+  save(); render();
+}
+function setMetricNote(val){
+  const m = metricsFor(todayISO());
+  m.notes = val.trim() ? val.trim() : null;
+  save(); render();
+}
+function delMetricNote(date){
+  const m = S.dailyMetrics.find(x=>x.date===date);
+  if(m) m.notes = null;
   save(); render();
 }
 
