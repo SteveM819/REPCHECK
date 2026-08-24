@@ -269,6 +269,7 @@ h1.screen{font-size:23px; font-weight:800; margin:6px 4px 14px;
 <nav>
   <button id="nav-today" onclick="go('today')"><span class="ic">◉</span>Today</button>
   <button id="nav-history" onclick="go('history')"><span class="ic">≡</span>History</button>
+  <button id="nav-analysis" onclick="go('analysis')"><span class="ic">▤</span>Analysis</button>
   <button id="nav-settings" onclick="go('settings')"><span class="ic">⚙︎</span>Settings</button>
 </nav>
 
@@ -286,7 +287,7 @@ h1.screen{font-size:23px; font-weight:800; margin:6px 4px 14px;
 /* IMPORTANT: the storage key keeps its historical name so every byte of
    existing data survives the rename. Renaming the key = losing the data. */
 const STORE_KEY = "atlasos_v1";
-const VERSION   = "0.5.1";
+const VERSION   = "0.6.0";
 const CATS = ["chest","back","shoulders","arms","legs","abs","cardio","other"];
 const SKIP_REASONS = ["busy","pain","time","fatigue","other"];
 const CARDIO_TYPES = ["run","row","stair","other"];
@@ -631,6 +632,152 @@ function stalledLifts(){
   return out.sort((a,b)=>b.sessions-a.sessions).slice(0,4);
 }
 
+/* ---------- ANALYSIS: cross-referenced facts + rule-based hypotheses ---------- */
+
+function strengthTrend(){
+  const results = [];
+  for(const ex of S.exercises){
+    const series = exSeries(ex.id);
+    if(series.length < 2) continue;
+    const recent = series[series.length-1].v;
+    const baseline = series[Math.max(0, series.length-5)].v;
+    const d = Math.round((recent-baseline)*10)/10;
+    const cls = d>0.4 ? "up" : d<-0.4 ? "down" : "flat";
+    results.push({exId:ex.id, name:ex.name, cls, delta:d, recent});
+  }
+  const up = results.filter(r=>r.cls==="up").length;
+  const down = results.filter(r=>r.cls==="down").length;
+  return {results, up, down, flat:results.length-up-down, total:results.length};
+}
+
+function recentPRs(days){
+  const cutoff = isoShift(todayISO(), -days);
+  const out = [];
+  for(const ex of S.exercises){
+    const rec = recordsFor(ex.id);
+    if(rec.bestE && rec.bestE.date >= cutoff){
+      out.push({name:ex.name, date:rec.bestE.date, e1rm:rec.bestE.v});
+    }
+  }
+  return out.sort((a,b)=>b.date.localeCompare(a.date));
+}
+
+function setsVs4WeekAvg(){
+  const [wf, wt] = weekRange(todayISO());
+  const thisW = setsInRange(wf, wt);
+  const priorTotal = {};
+  for(let i=1;i<=4;i++){
+    const [pf,pt] = weekRange(isoShift(wf, -7*i));
+    const wkStats = setsInRange(pf, pt);
+    for(const [g,n] of Object.entries(wkStats.byGroup)) priorTotal[g] = (priorTotal[g]||0)+n;
+  }
+  const avg = {};
+  for(const g of Object.keys(priorTotal)) avg[g] = Math.round(priorTotal[g]/4*10)/10;
+  return {thisW, avg};
+}
+
+function effortStats(days){
+  const cutoff = isoShift(todayISO(), -days);
+  let sum=0, n=0, close=0;
+  for(const sess of S.sessions){
+    if(sess.date < cutoff) continue;
+    for(const en of sess.entries) for(const s of en.sets){
+      if(s.isWarmup || s.effort===null || s.effort===undefined) continue;
+      sum += s.effort; n++;
+      if(s.effort<=1) close++;
+    }
+  }
+  if(!n) return null;
+  return {avg: Math.round(sum/n*10)/10, closePct: Math.round(close/n*100), n};
+}
+
+function dropOff(days){
+  const cutoff = isoShift(todayISO(), -days);
+  let flagged = [];
+  for(const sess of S.sessions){
+    if(sess.date < cutoff) continue;
+    for(const en of sess.entries){
+      const working = en.sets.filter(s=>!s.isWarmup);
+      if(working.length < 3) continue;
+      const first = working[0], last = working[working.length-1];
+      if(first.weightKg===last.weightKg && first.reps>0){
+        const dropPct = Math.round((1 - last.reps/first.reps)*100);
+        if(dropPct >= 30) flagged.push({date:sess.date, name:exById(en.exerciseId)?.name, dropPct});
+      }
+    }
+  }
+  return flagged;
+}
+
+function baselineCheck(){
+  const out = [];
+  for(const ex of S.exercises.filter(e=>e.isCompound)){
+    const series = exSeries(ex.id);
+    if(series.length < 4) continue;
+    const recent = series[series.length-1].v;
+    const window = series.slice(-8);
+    const baseline = Math.round(window.reduce((a,p)=>a+p.v,0)/window.length*10)/10;
+    const pct = baseline ? Math.round((recent-baseline)/baseline*100) : 0;
+    if(pct <= -8) out.push({name:ex.name, recent, baseline, pct});
+  }
+  return out;
+}
+
+function trainingFrequency(days){
+  const cutoff = isoShift(todayISO(), -days);
+  const n = S.sessions.filter(s=>s.date>=cutoff).length;
+  const weeks = days/7;
+  return {sessions:n, perWeek: Math.round(n/weeks*10)/10};
+}
+
+function fatigueSignals(days){
+  const cutoff = isoShift(todayISO(), -days);
+  const poorSleep = S.dailyMetrics.filter(m=>m.date>=cutoff && m.sleepHours!==null && m.sleepHours!==undefined && m.sleepHours<6).length;
+  const drops = dropOff(days).length;
+  return {poorSleepNights:poorSleep, dropOffSessions:drops};
+}
+
+function consistencyStats(days){
+  const cutoff = isoShift(todayISO(), -days);
+  let planned=0, completed=0;
+  const loggedDates = new Set(S.sessions.filter(s=>s.date>=cutoff).map(s=>s.date));
+  for(let i=0;i<days;i++){
+    const d = isoShift(todayISO(), -i);
+    const plan = WEEK[new Date(d+"T12:00:00").getDay()];
+    if(plan && plan!=="REST" && plan!=="RUN" && plan!=="LONGRUN"){
+      planned++;
+      if(loggedDates.has(d)) completed++;
+    }
+  }
+  return {planned, completed, pct: planned? Math.round(completed/planned*100):null};
+}
+
+function analysisHeadline(){
+  const rules = [];
+  const strength = strengthTrend();
+  const hyper = setsVs4WeekAvg();
+  const quality = effortStats(28);
+  const recovery = baselineCheck();
+  const consistency = consistencyStats(28);
+
+  const totalNow = hyper.thisW.total;
+  const totalAvg = Object.values(hyper.avg).reduce((a,b)=>a+b,0);
+  if(totalAvg>0 && totalNow > totalAvg*1.1 && strength.total>0 && strength.up < strength.total*0.4){
+    rules.push(`Your weekly volume is up ${Math.round((totalNow/totalAvg-1)*100)}% vs your 4-week average, but only ${strength.up} of ${strength.total} tracked lifts are trending up. Before adding more volume, consider whether recovery or exercise selection is limiting progression.`);
+  }
+  if(recovery.length){
+    rules.push(`${recovery.map(r=>r.name).join(", ")} ${recovery.length>1?"are":"is"} tracking below your recent baseline — worth checking sleep and stress before pushing harder there.`);
+  }
+  if(consistency.pct!==null && consistency.pct < 70){
+    rules.push(`You've completed ${consistency.completed} of ${consistency.planned} planned sessions in the last 4 weeks (${consistency.pct}%) — most of the other signals here will be noisy until consistency improves.`);
+  }
+  if(quality && quality.avg!==null && quality.avg<=1.5 && !recovery.length){
+    rules.push(`You're training close to failure (avg RIR ${quality.avg}) and performance is holding at or above baseline — that combination is unusual and worth keeping an eye on for a couple more weeks.`);
+  }
+  if(!rules.length) rules.push("Nothing stands out enough yet to call — keep logging and check back in a couple of weeks.");
+  return rules;
+}
+
 /* Bodyweight: average over the 7 days ending at `endDate` (inclusive). */
 function bw7(endDate){
   const from = isoShift(endDate, -6);
@@ -828,13 +975,14 @@ let cardioType = "run";
 let detailExId = null;   /* which exercise the detail screen shows */
 let backView = "today";  /* where its Back button returns to */
 let editTid = null;      /* which template the editor is editing */
+let rirPromptFor = null;  // {ei, si} of the set currently showing its RIR picker, or null
 function go(v){ view=v; render(); window.scrollTo(0,0); }
 function openEx(exId, from){ detailExId = exId; backView = from || view; go("exercise"); }
 
 function render(){
   $("#headdate").textContent = new Date().toLocaleDateString("en-AU",
     {weekday:"short", day:"numeric", month:"short"});
-  ["today","history","settings"].forEach(v=>
+  ["today","history","analysis","settings"].forEach(v=>
     $("#nav-"+v).classList.toggle("active", view===v ||
       (v==="today" && (view==="session"||view==="summary")) ||
       (v==="settings" && (view==="templates"||view==="tedit"))));
@@ -843,6 +991,7 @@ function render(){
   if(view==="session")   m.innerHTML = SessionScreen();
   if(view==="summary")   m.innerHTML = SummaryScreen();
   if(view==="history")   m.innerHTML = HistoryScreen();
+  if(view==="analysis")  m.innerHTML = AnalysisScreen();
   if(view==="settings")  m.innerHTML = SettingsScreen();
   if(view==="exercise")  m.innerHTML = ExerciseScreen();
   if(view==="templates") m.innerHTML = TemplatesScreen();
@@ -1057,6 +1206,16 @@ function SessionScreen(){
           <button class="chipbtn" onclick="checkAll(${ei})">✓ all ⏱</button>
           <button class="chipbtn" onclick="exMenu(${ei})">⋯</button></span></div>`;
       en.sets.forEach((s, si)=>{
+        if(rirPromptFor && rirPromptFor.ei===ei && rirPromptFor.si===si){
+          h += `<div class="setrow done" data-ei="${ei}" data-si="${si}">
+            <span class="setnum">${si+1}</span>
+            <span class="lastline" style="margin:0 6px 0 2px">RIR?</span>
+            <span class="row" style="gap:6px; flex:1">
+              ${[0,1,2,3,4].map(n=>`<button class="chipbtn" onclick="logRir(${ei},${si},${n})">${n===4?"4+":n}</button>`).join("")}
+            </span>
+          </div>`;
+          return;
+        }
         h += `<div class="setrow ${s.done?"done":""}" data-ei="${ei}" data-si="${si}">
           <button class="setnum ${s.isWarmup?"warm":""}" style="background:none;border:none"
             onclick="toggleWarm(${ei},${si})">${s.isWarmup?"W":si+1}</button>
@@ -1069,7 +1228,7 @@ function SessionScreen(){
           <input class="val reps" type="number" inputmode="numeric" onfocus="this.select()"
             value="${s.reps}" onchange="setVal(${ei},${si},'reps',this.value)">
           <button class="step" onclick="bump(${ei},${si},'reps',1)">＋</button>
-          <button class="check" onclick="toggleDone(${ei},${si})">✓<span class="tclk">⏱</span></button>
+          <button class="check" onclick="toggleDone(${ei},${si})">${s.done && (s.effort===0||s.effort) ? "✓<span class=\"tclk\">"+(s.effort===4?"4+":s.effort)+"</span>" : "✓<span class=\"tclk\">⏱</span>"}</button>
         </div>`;
       });
       h += `<button class="addset" onclick="addSet(${ei})">+ Add set</button></div>`;
@@ -1367,6 +1526,68 @@ function HistoryScreen(){
 function toggleH(id){ const el=$("#h-"+id);
   el.style.display = el.style.display==="none" ? "block" : "none"; }
 
+/* ----- ANALYSIS ----- */
+function AnalysisScreen(){
+  let h = `<h1 class="screen">Analysis</h1>`;
+  h += `<div class="card"><h2>What's actually going on</h2>`;
+  for(const line of analysisHeadline())
+    h += `<div class="note" style="margin-top:8px; color:var(--text); font-size:14px; line-height:1.6">${esc(line)}</div>`;
+  h += `<div class="note" style="margin-top:10px">Hypothesis — a candidate explanation, not a verdict.</div></div>`;
+
+  const strength = strengthTrend();
+  h += `<div class="card"><h2>Strength</h2>
+    <div class="factrow"><span>Trending up</span><span class="factval">${strength.up} / ${strength.total}</span></div>`;
+  const prs = recentPRs(30);
+  if(prs.length){
+    h += `<div class="note" style="margin-top:8px">Recent PRs</div>`;
+    for(const p of prs.slice(0,5))
+      h += `<div class="factrow"><span>${esc(p.name)}</span><span class="factval">${p.e1rm} e1RM · ${p.date}</span></div>`;
+  }
+  h += `</div>`;
+
+  const hyper = setsVs4WeekAvg();
+  h += `<div class="card"><h2>Muscle growth</h2>`;
+  for(const [g,n] of Object.entries(hyper.thisW.byGroup)){
+    const avg = hyper.avg[g]||0;
+    const cls = n>avg*1.05?"up":n<avg*0.95?"down":"flat";
+    h += `<div class="factrow"><span style="text-transform:capitalize">${esc(g)}</span>
+      <span class="row" style="gap:8px"><span class="factval">${n} sets</span>
+      <span class="delta ${cls}">vs ${avg} avg</span></span></div>`;
+  }
+  h += `</div>`;
+
+  const quality = effortStats(28);
+  h += `<div class="card"><h2>Training quality</h2>`;
+  if(quality){
+    h += `<div class="factrow"><span>Avg RIR (28d)</span><span class="factval">${quality.avg}</span></div>
+      <div class="factrow"><span>Sets at RIR 0-1</span><span class="factval">${quality.closePct}%</span></div>`;
+  } else {
+    h += `<div class="empty">Log a few sets with RIR to see this.</div>`;
+  }
+  const drops = dropOff(28);
+  if(drops.length) h += `<div class="note" style="margin-top:8px">${drops.length} session${drops.length>1?"s":""} showed a notable rep drop-off within a set block.</div>`;
+  h += `</div>`;
+
+  const recovery = baselineCheck();
+  const freq = trainingFrequency(28);
+  const fatigue = fatigueSignals(28);
+  h += `<div class="card"><h2>Recovery</h2>
+    <div class="factrow"><span>Sessions / week (28d)</span><span class="factval">${freq.perWeek}</span></div>
+    <div class="factrow"><span>Nights under 6h sleep</span><span class="factval">${fatigue.poorSleepNights}</span></div>`;
+  if(recovery.length){
+    for(const r of recovery)
+      h += `<div class="factrow"><span>${esc(r.name)}</span><span class="delta down">${r.pct}% vs baseline</span></div>`;
+  }
+  h += `</div>`;
+
+  const cons = consistencyStats(28);
+  h += `<div class="card"><h2>Consistency</h2>
+    <div class="factrow"><span>Planned vs completed (28d)</span><span class="factval">${cons.completed} / ${cons.planned}${cons.pct!==null?" ("+cons.pct+"%)":""}</span></div>
+    </div>`;
+
+  return h;
+}
+
 /* ----- SETTINGS ----- */
 function SettingsScreen(){
   const age = backupAgeDays();
@@ -1569,9 +1790,21 @@ function setVal(ei, si, field, v){
 }
 function toggleDone(ei, si){
   const s = S.draft.entries[ei].sets[si];
-  s.done = !s.done;
-  if(s.done) restStart(S.settings.restDefaultSec);
+  if(s.done){
+    s.done = false;
+    render();
+    return;
+  }
+  rirPromptFor = {ei, si};
   render();
+}
+function logRir(ei, si, rir){
+  const s = S.draft.entries[ei].sets[si];
+  s.effort = rir;
+  s.done = true;
+  rirPromptFor = null;
+  restStart(S.settings.restDefaultSec);
+  save(); render();
 }
 function toggleWarm(ei, si){
   const s = S.draft.entries[ei].sets[si];
@@ -1800,3 +2033,4 @@ if(window.RepCheckCloud){
 </script>
 </body>
 </html>
+
