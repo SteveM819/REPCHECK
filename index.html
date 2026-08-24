@@ -9,56 +9,76 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="RepCheck">
-<meta name="theme-color" content="#0C0F14">
+<meta name="theme-color" content="#0B0F10">
 <link rel="apple-touch-icon" href="icon.png">
 
 <style>
 /* =====================================================================
-   REPCHECK — v0.4.1 "The Exercise"
-   Template editor (with supersets) · per-exercise case files: e1RM
-   progression chart, all-time records, session log · delta verdicts and
-   stall detection judged by estimated 1RM · rep targets in-session.
-   Design language: instrument panel; colour encodes data direction.
+   REPCHECK — v0.7.0 "Concept C"
+   Visual language: flat instrument panel on near-black, single lime
+   accent, no gradients. Colour still encodes data direction —
+   lime = improving, coral = declining, amber = attention, teal = cardio.
+   Hypothesis surfaces use the warm amber-tinted card so that
+   interpretation never wears the same skin as arithmetic.
    ===================================================================== */
 :root{
-  --bg:      #0C0F14;
-  --surface: #141A22;
-  --surface2:#1D2530;
-  --line:    #29323F;
-  --text:    #EAF0F6;
-  --muted:   #8A97A6;
-  --act:     #7FB2E5;
-  --grad:    linear-gradient(135deg,#6EA8E8 0%,#8F7BFF 100%);
-  --gym:     #8F7BFF;
+  --bg:      #0B0F10;
+  --surface: #12181A;
+  --surface2:#1A2124;
+  --line:    #242D30;
+  --text:    #F2F3EE;
+  --muted:   #7C837B;
+  --muted2:  #9AA39C;
+  --act:     #C8FF4D;
+  --grad:    #C8FF4D;
+  --onacc:   #0D1406;
+  --gym:     #C8FF4D;
   --cardio:  #4FC7D4;
-  --up:      #6FD99B;
-  --down:    #E08A6E;
-  --warn:    #E0B95A;
-  --flat:    #8A97A6;
+  --up:      #C8FF4D;
+  --down:    #F0865C;
+  --warn:    #F2B134;
+  --flat:    #7C837B;
+  --hypobg:  #171310;
+  --hypoline:#3A2F1E;
+  --hypotx:  #B7AE9A;
   --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, monospace;
   --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  --r: 18px;
+  --r: 16px;
 }
 *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
 html,body{margin:0; padding:0; background:var(--bg); color:var(--text);
   font-family:var(--sans); font-size:16px; overscroll-behavior-y:none;}
 body{padding-bottom:calc(84px + env(safe-area-inset-bottom));
-  background-image:radial-gradient(120% 50% at 50% -10%, #16202e 0%, var(--bg) 60%);}
+  background-image:none;}
 
 header{padding:calc(16px + env(safe-area-inset-top)) 18px 12px;
-  display:flex; align-items:baseline; justify-content:space-between;}
-.wordmark{font-weight:800; letter-spacing:.14em; font-size:15px;}
-.wordmark span{background:var(--grad); -webkit-background-clip:text;
-  background-clip:text; color:transparent;}
+  display:flex; align-items:center; justify-content:space-between;}
+.wordmark{font-weight:800; letter-spacing:.12em; font-size:15px;
+  display:flex; align-items:center; gap:9px;}
+.wordmark .wm{color:var(--text);}
+/* Concept C logo: three ascending bars, the "rep check" mark */
+.logomark{display:flex; align-items:flex-end; gap:2px; height:16px; flex:none;}
+.logomark i{width:4px; background:var(--act); border-radius:1px 1px 0 0;
+  display:block;}
+.logomark i:nth-child(1){height:40%;}
+.logomark i:nth-child(2){height:65%;}
+.logomark i:nth-child(3){height:100%;}
 .headdate{font-family:var(--mono); font-size:12px; color:var(--muted);}
 
 main{padding:0 14px;}
 .card{background:var(--surface); border:1px solid var(--line);
   border-radius:var(--r); padding:16px; margin-bottom:12px;
-  box-shadow:0 10px 24px rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.03);}
-.card h2{margin:0 0 2px; font-size:12px; font-weight:700; color:var(--muted);
-  text-transform:uppercase; letter-spacing:.1em;}
+  box-shadow:none;}
+.card h2{margin:0 0 2px; font-size:11px; font-weight:700; color:var(--muted);
+  text-transform:uppercase; letter-spacing:.09em;}
 .big{font-size:27px; font-weight:800; margin:3px 0 0; letter-spacing:-.02em;}
+
+/* Hypothesis surface — interpretation must never look like arithmetic. */
+.card.hypo{background:var(--hypobg); border-color:var(--hypoline);}
+.card.hypo h2{color:var(--hypotx);}
+.card.hypo .note{color:var(--hypotx);}
+.hypotag{display:inline-block; font-size:10px; font-weight:800; color:var(--warn);
+  letter-spacing:.1em; margin-bottom:6px;}
 .sub{color:var(--muted); font-size:13px; margin-top:3px;}
 .row{display:flex; align-items:center; gap:10px;}
 .spread{display:flex; align-items:center; justify-content:space-between;}
@@ -67,35 +87,37 @@ button{font-family:var(--sans); border:none; cursor:pointer;
   transition:transform .12s ease, filter .12s ease;}
 button:active{transform:scale(.96);}
 .btn{width:100%; padding:15px; border-radius:14px; font-size:16px;
-  font-weight:700; background:var(--grad); color:#0A1220;
-  box-shadow:0 8px 20px rgba(110,150,235,.28);}
+  font-weight:700; background:var(--grad); color:var(--onacc);
+  box-shadow:none;}
 .btn.secondary{background:var(--surface2); color:var(--text);
   border:1px solid var(--line); box-shadow:none;}
 .btn.danger{background:transparent; color:var(--down);
   border:1px solid var(--down); box-shadow:none;}
-.btn.teal{background:linear-gradient(135deg,#4FC7D4,#5AD8A6); color:#062126;
-  box-shadow:0 8px 20px rgba(79,199,212,.25);}
+.btn.teal{background:var(--cardio); color:#062126; box-shadow:none;}
+/* Lime is reserved for the one primary action on a screen; guardrail
+   actions wear amber so they read as "attend to this", not "do this next". */
+.btn.warn{background:transparent; color:var(--warn);
+  border:1px solid rgba(242,177,52,.55); box-shadow:none;}
 .chipbtn{background:var(--surface2); border:1px solid var(--line);
   color:var(--act); font-size:12px; font-weight:700; padding:7px 11px;
   border-radius:999px;}
-.chipbtn.sel{background:var(--grad); color:#0A1220; border-color:transparent;}
-.chipbtn.tealsel{background:linear-gradient(135deg,#4FC7D4,#5AD8A6);
-  color:#062126; border-color:transparent;}
+.chipbtn.sel{background:var(--grad); color:var(--onacc); border-color:transparent;}
+.chipbtn.tealsel{background:var(--cardio); color:#062126; border-color:transparent;}
 
 .delta{font-family:var(--mono); font-size:12.5px; font-weight:600;
   padding:4px 9px; border-radius:999px; white-space:nowrap;
   background:var(--surface2); border:1px solid var(--line);}
-.delta.up  {color:var(--up);   background:rgba(111,217,155,.10); border-color:rgba(111,217,155,.35);}
-.delta.down{color:var(--down); background:rgba(224,138,110,.10); border-color:rgba(224,138,110,.35);}
-.delta.warn{color:var(--warn); background:rgba(224,185,90,.10);  border-color:rgba(224,185,90,.35);}
+.delta.up  {color:var(--up);   background:rgba(200,255,77,.10); border-color:rgba(200,255,77,.35);}
+.delta.down{color:var(--down); background:rgba(240,134,92,.10); border-color:rgba(240,134,92,.38);}
+.delta.warn{color:var(--warn); background:rgba(242,177,52,.10); border-color:rgba(242,177,52,.38);}
 .delta.teal{color:var(--cardio); background:rgba(79,199,212,.10); border-color:rgba(79,199,212,.35);}
 .delta.flat{color:var(--flat);}
 
 /* kind badges: colour-coded session identity */
 .badge{font-size:10px; font-weight:800; letter-spacing:.1em; padding:3px 8px;
   border-radius:999px; text-transform:uppercase;}
-.badge.gym{background:rgba(143,123,255,.15); color:var(--gym);
-  border:1px solid rgba(143,123,255,.4);}
+.badge.gym{background:rgba(200,255,77,.13); color:var(--gym);
+  border:1px solid rgba(200,255,77,.38);}
 .badge.cardio{background:rgba(79,199,212,.14); color:var(--cardio);
   border:1px solid rgba(79,199,212,.4);}
 
@@ -107,17 +129,58 @@ button:active{transform:scale(.96);}
 .metric input{width:100%; background:transparent; border:none; color:var(--text);
   font-family:var(--mono); font-size:18px; font-weight:600; padding:2px 0;
   outline:none;}
-.metric input::placeholder{color:#3a4655;}
+.metric input::placeholder{color:#3A4340;}
 
 .bar{height:9px; background:var(--surface2); border-radius:6px;
   overflow:hidden; margin-top:9px;}
 .bar > div{height:100%; background:var(--grad); border-radius:6px;
   transition:width .35s cubic-bezier(.2,.8,.2,1);}
-.bar.teal > div{background:linear-gradient(90deg,#4FC7D4,#5AD8A6);}
+.bar.teal > div{background:var(--cardio);}
+
+/* ---------- Concept C hero + stall watch (Today) ---------- */
+.hero{background:var(--surface); border:1px solid var(--line);
+  border-radius:var(--r); padding:20px; margin-bottom:12px;}
+.hero .herolabel{font-size:11px; color:var(--muted); margin-bottom:6px;}
+.hero .heroval{font-size:40px; font-weight:800; letter-spacing:-.03em;
+  line-height:1;}
+.hero .heroval u{font-size:18px; font-weight:600; color:var(--muted);
+  text-decoration:none; margin-left:4px;}
+.hero .herodelta{font-size:13px; margin-top:5px; font-family:var(--mono);}
+.hero .herodelta.up{color:var(--up);}
+.hero .herodelta.down{color:var(--down);}
+.hero .herodelta.flat{color:var(--flat);}
+.spark{display:flex; align-items:flex-end; gap:4px; height:34px; margin-top:14px;}
+.spark div{flex:1; background:#2A3A26; border-radius:2px; min-height:2px;}
+.spark div.now{background:var(--act);}
+
+.statgrid{display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px;}
+.stat{background:var(--surface); border:1px solid var(--line);
+  border-radius:14px; padding:14px;}
+.stat .k{font-size:10px; color:var(--muted); text-transform:uppercase;
+  letter-spacing:.08em; margin-bottom:6px;}
+.stat .v{font-size:19px; font-weight:800; font-family:var(--mono);}
+.stat .v.up{color:var(--up);} .stat .v.down{color:var(--down);}
+.stat .v.warn{color:var(--warn);} .stat .v.flat{color:var(--text);}
+
+.stalllist{background:var(--surface); border:1px solid var(--line);
+  border-radius:14px; overflow:hidden; margin-bottom:12px;}
+.stallitem{display:flex; justify-content:space-between; align-items:center;
+  gap:10px; padding:12px 14px; border-bottom:1px solid var(--line);}
+.stallitem:last-child{border-bottom:none;}
+.stallname{font-size:13.5px;}
+.stallname small{display:block; color:var(--muted); font-size:11px;
+  font-family:var(--mono); margin-top:2px;}
+.pill{font-size:10px; padding:4px 9px; border-radius:999px; font-weight:800;
+  letter-spacing:.03em; white-space:nowrap;}
+.pill.warn{background:rgba(242,177,52,.13); color:var(--warn);}
+.pill.up{background:rgba(200,255,77,.13); color:var(--up);}
+.sectitle{font-size:12px; font-weight:800; color:var(--muted);
+  text-transform:uppercase; letter-spacing:.09em; margin:16px 4px 8px;}
 
 /* facts */
 .factrow{display:flex; justify-content:space-between; align-items:center;
-  padding:9px 0; border-bottom:1px solid var(--line); font-size:14px;}
+  gap:12px; padding:9px 0; border-bottom:1px solid var(--line); font-size:14px;}
+.factrow > span:first-child{min-width:0;}
 .factrow:last-child{border-bottom:none;}
 .factval{font-family:var(--mono); font-weight:700;}
 .sumgrid{display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:10px;}
@@ -129,14 +192,14 @@ button:active{transform:scale(.96);}
 
 /* ---------- session ---------- */
 .sessionhead{position:sticky; top:0; z-index:5; margin:0 -14px 10px;
-  padding:10px 16px; background:rgba(12,15,20,.88); backdrop-filter:blur(14px);
+  padding:10px 16px; background:rgba(11,15,16,.92); backdrop-filter:blur(14px);
   border-bottom:1px solid var(--line); display:flex; align-items:center;
   justify-content:space-between;}
 .sessionhead .t{font-size:18px; font-weight:800;}
 .sessionhead .m{font-family:var(--mono); font-size:12px; color:var(--muted);}
 .hint{font-size:11.5px; color:var(--muted); margin:0 4px 12px; line-height:1.5;}
 .ssflag{display:inline-block; font-size:10px; font-weight:800;
-  letter-spacing:.12em; color:#0A1220; background:var(--grad);
+  letter-spacing:.12em; color:var(--onacc); background:var(--grad);
   padding:3px 8px; border-radius:999px; margin-bottom:8px;}
 .exblock + .exblock{margin-top:14px; padding-top:14px;
   border-top:1px dashed var(--line);}
@@ -163,7 +226,7 @@ button:active{transform:scale(.96);}
   color:var(--muted); font-size:16px; font-weight:700;}
 .check .tclk{font-size:9px; opacity:.75; vertical-align:top;}
 .setrow.done .check{background:var(--up); border-color:var(--up);
-  color:#0A1220; box-shadow:0 4px 14px rgba(111,217,155,.35);}
+  color:var(--onacc); box-shadow:none;}
 .addset{margin-top:10px; background:transparent; color:var(--act);
   font-size:14px; font-weight:600; padding:6px 0;}
 
@@ -183,7 +246,7 @@ button:active{transform:scale(.96);}
 #rest .rb{background:var(--surface); border:1px solid var(--line);
   color:var(--act); font-family:var(--mono); font-size:13px; font-weight:700;
   padding:9px 12px; border-radius:999px;}
-#rest .rb.again{background:var(--up); color:#0A1220; border-color:var(--up);}
+#rest .rb.again{background:var(--up); color:var(--onacc); border-color:var(--up);}
 
 /* ---------- modal sheet ---------- */
 #modal{position:fixed; inset:0; z-index:50; display:none;
@@ -215,14 +278,16 @@ button:active{transform:scale(.96);}
   color:var(--muted); line-height:1.7;}
 
 nav{position:fixed; bottom:0; left:0; right:0; display:flex; gap:4px;
-  background:rgba(12,15,20,.9); backdrop-filter:blur(16px);
+  background:rgba(11,15,16,.94); backdrop-filter:blur(16px);
   border-top:1px solid var(--line);
   padding:10px 10px calc(10px + env(safe-area-inset-bottom));}
-nav button{flex:1; background:none; color:var(--muted); font-size:12px;
-  font-weight:700; letter-spacing:.04em; padding:9px 0; border-radius:12px;}
-nav button.active{color:var(--text); background:var(--surface2);
-  border:1px solid var(--line);}
-nav .ic{display:block; font-size:19px; margin-bottom:2px;}
+nav button{flex:1; background:none; color:var(--muted); font-size:11px;
+  font-weight:700; letter-spacing:.04em; padding:9px 0; border-radius:12px;
+  border:1px solid transparent;}
+nav button.active{color:var(--text); background:transparent; border-color:transparent;}
+nav .ic{display:block; font-size:19px; margin-bottom:3px; color:var(--muted);
+  line-height:1;}
+nav button.active .ic{color:var(--act);}
 
 .empty{color:var(--muted); text-align:center; padding:28px 10px;
   font-size:14px; line-height:1.6;}
@@ -235,13 +300,13 @@ h1.screen{font-size:23px; font-weight:800; margin:6px 4px 14px;
   border:1px solid var(--line); position:relative;}
 .switch.on{background:var(--grad); border-color:transparent;}
 .switch::after{content:""; position:absolute; top:3px; left:3px; width:22px;
-  height:22px; border-radius:50%; background:#fff; transition:left .15s;}
-.switch.on::after{left:25px;}
+  height:22px; border-radius:50%; background:var(--text); transition:left .15s;}
+.switch.on::after{left:25px; background:var(--onacc);}
 .rate{display:flex; gap:8px; margin-top:10px;}
 .rate button{flex:1; padding:13px 0; border-radius:12px; font-size:16px;
   font-weight:800; background:var(--surface2); border:1px solid var(--line);
   color:var(--muted);}
-.rate button.sel{background:var(--grad); color:#0A1220; border-color:transparent;}
+.rate button.sel{background:var(--grad); color:var(--onacc); border-color:transparent;}
 @media (prefers-reduced-motion: reduce){ *{transition:none !important; animation:none !important;} }
 </style>
 <!-- Cloud sync (added for the Supabase migration — see repcheck-cloud-sync.js) -->
@@ -251,7 +316,7 @@ h1.screen{font-size:23px; font-weight:800; margin:6px 4px 14px;
 <body>
 
 <header>
-  <div class="wordmark">REP<span>CHECK</span></div>
+  <div class="wordmark"><span class="logomark"><i></i><i></i><i></i></span><span class="wm">REPCHECK</span></div>
   <div class="headdate" id="headdate"></div>
 </header>
 
@@ -287,7 +352,7 @@ h1.screen{font-size:23px; font-weight:800; margin:6px 4px 14px;
 /* IMPORTANT: the storage key keeps its historical name so every byte of
    existing data survives the rename. Renaming the key = losing the data. */
 const STORE_KEY = "atlasos_v1";
-const VERSION   = "0.6.0";
+const VERSION   = "0.7.0";
 const CATS = ["chest","back","shoulders","arms","legs","abs","cardio","other"];
 const SKIP_REASONS = ["busy","pain","time","fatigue","other"];
 const CARDIO_TYPES = ["run","row","stair","other"];
@@ -576,11 +641,11 @@ function exChart(exId){
   const line = xy.map(p=>p[0].toFixed(1)+","+p[1].toFixed(1)).join(" ");
   const lastP = xy[xy.length-1];
   return `<svg width="100%" viewBox="0 0 ${W} ${H}" style="margin-top:8px">
-    <polyline points="${line}" fill="none" stroke="#8F7BFF" stroke-width="2"
+    <polyline points="${line}" fill="none" stroke="#C8FF4D" stroke-width="2"
       stroke-linejoin="round" stroke-linecap="round"/>
-    <circle cx="${lastP[0].toFixed(1)}" cy="${lastP[1].toFixed(1)}" r="3.5" fill="#6FD99B"/>
-    <text x="${P}" y="12" fill="#8A97A6" font-size="10" font-family="monospace">${max}</text>
-    <text x="${P}" y="${H-2}" fill="#8A97A6" font-size="10" font-family="monospace">${min}</text>
+    <circle cx="${lastP[0].toFixed(1)}" cy="${lastP[1].toFixed(1)}" r="3.5" fill="#F2F3EE"/>
+    <text x="${P}" y="12" fill="#7C837B" font-size="10" font-family="monospace">${max}</text>
+    <text x="${P}" y="${H-2}" fill="#7C837B" font-size="10" font-family="monospace">${min}</text>
   </svg>
   <div class="note" style="margin-top:2px">Top-set e1RM, last ${pts.length} sessions
     (bodyweight lifts chart reps).</div>`;
@@ -820,10 +885,52 @@ function sparkline(){
   const line = xy.map(p=>p[0].toFixed(1)+","+p[1].toFixed(1)).join(" ");
   const last = xy[xy.length-1];
   return `<svg width="100%" viewBox="0 0 ${W} ${H}" style="margin-top:8px">
-    <polyline points="${line}" fill="none" stroke="#6EA8E8" stroke-width="2"
+    <polyline points="${line}" fill="none" stroke="#C8FF4D" stroke-width="2"
       stroke-linejoin="round" stroke-linecap="round"/>
-    <circle cx="${last[0].toFixed(1)}" cy="${last[1].toFixed(1)}" r="3.5" fill="#6FD99B"/>
+    <circle cx="${last[0].toFixed(1)}" cy="${last[1].toFixed(1)}" r="3.5" fill="#F2F3EE"/>
   </svg>`;
+}
+
+/* Which lift does the Today hero speak about? Deterministic, in order:
+   the session in progress, then today's planned template, then the
+   most-logged lift. Returns null when nothing has two sessions yet.   */
+function focusLift(){
+  if(S.draft && S.draft.entries && S.draft.entries.length){
+    const id = S.draft.entries[0].exerciseId;
+    if(exSeries(id).length >= 1) return id;
+  }
+  const plan = WEEK[new Date().getDay()];
+  const t = S.templates.find(x=>x.id===plan);
+  if(t && t.slots && t.slots.length){
+    const id = t.slots[0].exerciseId;
+    if(exSeries(id).length >= 1) return id;
+  }
+  let best=null, bestN=0;
+  for(const ex of S.exercises){
+    const n = exSeries(ex.id).length;
+    if(n>bestN){ bestN=n; best=ex.id; }
+  }
+  return bestN >= 1 ? best : null;
+}
+
+/* "2026-08-24" -> "24 Aug" — long ISO dates blow out narrow fact rows. */
+function shortDate(iso){
+  const d = new Date(iso+"T12:00:00");
+  if(isNaN(d)) return iso;
+  return d.toLocaleDateString("en-AU",{day:"numeric", month:"short"});
+}
+
+/* Bar sparkline of the last n top-set e1RMs for one lift. */
+function e1rmBars(exId, n){
+  const pts = exSeries(exId).slice(-(n||7));
+  if(pts.length < 2) return "";
+  const vals = pts.map(p=>p.v);
+  const min = Math.min(...vals), max = Math.max(...vals);
+  const span = (max-min) || 1;
+  return `<div class="spark">` + pts.map((p,i)=>{
+    const pct = 32 + (p.v-min)/span*68;
+    return `<div class="${i===pts.length-1?"now":""}" style="height:${pct.toFixed(0)}%"></div>`;
+  }).join("") + `</div>`;
 }
 
 /* ---------- 5. TIMERS ---------- */
@@ -1008,6 +1115,43 @@ function TodayScreen(){
   const tgt  = S.settings.weeklyRunTargetKm;
   let h = "";
 
+  /* -- HERO: today's focus lift, judged by top-set e1RM (arithmetic only) -- */
+  const fid = focusLift();
+  if(fid){
+    const series = exSeries(fid);
+    const cur = series[series.length-1];
+    const prev = series.length>1 ? series[series.length-2] : null;
+    const d = prev ? Math.round((cur.v-prev.v)*10)/10 : null;
+    const cls = d===null ? "flat" : d>0.05 ? "up" : d<-0.05 ? "down" : "flat";
+    const lbl = d===null ? "first logged session"
+      : Math.abs(d)<0.05 ? "level with last session"
+      : (d>0?"+":"") + d + "kg since last session";
+    h += `<div class="hero" onclick="openEx('${fid}','today')">
+      <div class="herolabel">Today's focus — ${esc(exById(fid)?.name ?? fid)} · e1RM</div>
+      <div class="heroval">${cur.v}<u>kg</u></div>
+      <div class="herodelta ${cls}">${esc(lbl)}</div>
+      ${e1rmBars(fid, 7)}</div>`;
+  }
+
+  /* -- HERO STATS: last session volume + working sets vs last week -- */
+  const [hwf, hwt] = weekRange(todayISO());
+  const wkNow  = setsInRange(hwf, hwt);
+  const wkPrev = setsInRange(isoShift(hwf,-7), isoShift(hwt,-7));
+  const lastSess = [...S.sessions].sort((a,b)=>
+    b.date.localeCompare(a.date)||b.id.localeCompare(a.id))[0];
+  const vol = lastSess ? tonnage(lastSess.entries) : null;
+  let vsPct = null, vsCls = "flat";
+  if(wkPrev.total > 0){
+    vsPct = Math.round((wkNow.total-wkPrev.total)/wkPrev.total*100);
+    vsCls = vsPct>0 ? "up" : vsPct<0 ? "down" : "flat";
+  }
+  h += `<div class="statgrid">
+    <div class="stat"><div class="k">Last session volume</div>
+      <div class="v flat">${vol===null?"—":vol.toLocaleString()+"kg"}</div></div>
+    <div class="stat"><div class="k">Sets vs last week</div>
+      <div class="v ${vsCls}">${vsPct===null?"—":(vsPct>0?"+":"")+vsPct+"%"}</div></div>
+  </div>`;
+
   /* -- today's plan / resume -- */
   if(S.draft){
     h += `<div class="card"><h2>In progress</h2>
@@ -1048,7 +1192,7 @@ function TodayScreen(){
         <span class="delta warn">${age===null?"never exported":age+"d ago"}</span></div>
       <div class="note">Your data lives only on this phone. Export now, then save the file
         to iCloud Drive or Google Drive via the Files app.</div>
-      <div style="margin-top:10px"><button class="btn" onclick="exportData()">Export backup (.json)</button></div></div>`;
+      <div style="margin-top:10px"><button class="btn warn" onclick="exportData()">Export backup (.json)</button></div></div>`;
   }
 
   /* -- this week: deterministic facts -- */
@@ -1073,15 +1217,27 @@ function TodayScreen(){
       <span class="factval">${dur} min</span></div>`;
   h += `</div>`;
 
-  /* -- stalled lifts (only speaks when there's something to say) -- */
+  /* -- STALL WATCH: flat lifts alongside the ones still climbing.
+        Both sides are arithmetic on top-set e1RM — no interpretation. -- */
   const stalls = stalledLifts();
-  if(stalls.length){
-    h += `<div class="card" style="border-color:rgba(224,185,90,.4)"><h2 style="color:var(--warn)">No top-set progress</h2>`;
+  const climbing = strengthTrend().results
+    .filter(r=>r.cls==="up")
+    .sort((a,b)=>b.delta-a.delta)
+    .filter(r=>!stalls.some(s=>s.exId===r.exId))
+    .slice(0, Math.max(0, 4-stalls.length));
+  if(stalls.length || climbing.length){
+    h += `<div class="sectitle">Stall watch</div><div class="stalllist">`;
     for(const st of stalls)
-      h += `<div class="factrow" onclick="openEx('${st.exId}','today')"><span>${esc(st.name)}
-          <span style="color:var(--muted); font-size:12px">(best ${st.top})</span></span>
-        <span class="delta warn">${st.sessions} sessions ›</span></div>`;
-    h += `<div class="note">A fact, not a verdict — context (block, sleep, effort) comes later.</div></div>`;
+      h += `<div class="stallitem" onclick="openEx('${st.exId}','today')">
+        <span class="stallname">${esc(st.name)}<small>best ${esc(st.top)}</small></span>
+        <span class="pill warn">${st.sessions} sessions flat</span></div>`;
+    for(const r of climbing)
+      h += `<div class="stallitem" onclick="openEx('${r.exId}','today')">
+        <span class="stallname">${esc(r.name)}<small>${r.recent}kg e1RM</small></span>
+        <span class="pill up">+${r.delta}kg trending up</span></div>`;
+    h += `</div>`;
+    if(stalls.length) h += `<div class="note" style="margin:-4px 4px 12px">A fact, not a
+      verdict — context (block, sleep, effort) comes later.</div>`;
   }
 
   /* -- cardio: log + weekly progress -- */
@@ -1529,10 +1685,11 @@ function toggleH(id){ const el=$("#h-"+id);
 /* ----- ANALYSIS ----- */
 function AnalysisScreen(){
   let h = `<h1 class="screen">Analysis</h1>`;
-  h += `<div class="card"><h2>What's actually going on</h2>`;
+  h += `<div class="card hypo"><div class="hypotag">HYPOTHESIS — UNCONFIRMED</div>
+    <h2>What's actually going on</h2>`;
   for(const line of analysisHeadline())
     h += `<div class="note" style="margin-top:8px; color:var(--text); font-size:14px; line-height:1.6">${esc(line)}</div>`;
-  h += `<div class="note" style="margin-top:10px">Hypothesis — a candidate explanation, not a verdict.</div></div>`;
+  h += `<div class="note" style="margin-top:10px">A candidate explanation, not a verdict. Every card below this one is arithmetic.</div></div>`;
 
   const strength = strengthTrend();
   h += `<div class="card"><h2>Strength</h2>
@@ -1541,7 +1698,7 @@ function AnalysisScreen(){
   if(prs.length){
     h += `<div class="note" style="margin-top:8px">Recent PRs</div>`;
     for(const p of prs.slice(0,5))
-      h += `<div class="factrow"><span>${esc(p.name)}</span><span class="factval">${p.e1rm} e1RM · ${p.date}</span></div>`;
+      h += `<div class="factrow"><span>${esc(p.name)}</span><span class="factval">${p.e1rm} · ${shortDate(p.date)}</span></div>`;
   }
   h += `</div>`;
 
@@ -2033,4 +2190,6 @@ if(window.RepCheckCloud){
 </script>
 </body>
 </html>
+
+
 
