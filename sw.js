@@ -1,6 +1,6 @@
 /* RepCheck service worker — makes the app load with no signal.
    Strategy: cache-first for the app shell, refresh cache in background. */
-const CACHE = "repcheck-v0.7.0";
+const CACHE = "repcheck-v0.7.1";
 const SHELL = [
   "./",
   "./index.html",
@@ -33,4 +33,3 @@ self.addEventListener("fetch", e => {
     })
   );
 });
-
