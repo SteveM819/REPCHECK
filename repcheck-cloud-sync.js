@@ -40,7 +40,7 @@
    Single-user app, so this uses Supabase email OTP — no password,
    no link to follow. On first load with no session, a small
    full-screen overlay (styled to match Concept C) asks for an
-   email address, emails a 6-digit code, and takes the code as
+   email address, emails a numeric code, and takes the code as
    input right there in the same screen. This matters specifically
    for the installed iOS PWA: a magic link opens in Mail/Safari's
    in-app browser, a different storage context from the "Add to
@@ -49,7 +49,7 @@
    Session persists across visits once verified.
 
    REQUIRED ONE-TIME DASHBOARD STEP: Supabase decides whether an
-   email carries a clickable link or a 6-digit code purely from the
+   email carries a clickable link or a numeric code purely from the
    Magic Link template (Authentication > Email Templates in the
    dashboard) — the signInWithOtp() call is identical either way.
    The template must reference {{ .Token }} (e.g. "Your RepCheck
@@ -116,7 +116,7 @@
       "</div>" +
 
       '<div id="rc-auth-step-email">' +
-      '<div style="font-size:13px;color:#9aa39c;margin-bottom:18px;line-height:1.5;">Sign in to sync your sessions to the cloud. Enter your email and we\'ll send you a 6-digit code — no password, no link to follow.</div>' +
+      '<div style="font-size:13px;color:#9aa39c;margin-bottom:18px;line-height:1.5;">Sign in to sync your sessions to the cloud. Enter your email and we\'ll send you a code — no password, no link to follow.</div>' +
       '<input id="rc-auth-email" type="email" inputmode="email" autocomplete="email" placeholder="you@example.com" ' +
       'style="width:100%;height:44px;border-radius:10px;border:1px solid #2a3234;background:#12181a;color:#f2f3ee;padding:0 14px;font-size:14px;margin-bottom:10px;box-sizing:border-box;" />' +
       '<button id="rc-auth-send" style="width:100%;height:44px;border-radius:10px;border:none;background:#c8ff4d;color:#0d1406;font-weight:700;font-size:14px;">Send code</button>' +
@@ -124,9 +124,9 @@
       "</div>" +
 
       '<div id="rc-auth-step-code" style="display:none;">' +
-      '<div style="font-size:13px;color:#9aa39c;margin-bottom:18px;line-height:1.5;">Enter the 6-digit code sent to <span id="rc-auth-email-echo" style="color:#f2f3ee;"></span>.</div>' +
-      '<input id="rc-auth-code" type="text" inputmode="numeric" pattern="[0-9]*" autocomplete="one-time-code" maxlength="6" placeholder="123456" ' +
-      'style="width:100%;height:44px;border-radius:10px;border:1px solid #2a3234;background:#12181a;color:#f2f3ee;padding:0 14px;font-size:18px;letter-spacing:.2em;text-align:center;margin-bottom:10px;box-sizing:border-box;" />' +
+      '<div style="font-size:13px;color:#9aa39c;margin-bottom:18px;line-height:1.5;">Enter the code sent to <span id="rc-auth-email-echo" style="color:#f2f3ee;"></span>.</div>' +
+      '<input id="rc-auth-code" type="text" inputmode="numeric" pattern="[0-9]*" autocomplete="one-time-code" maxlength="10" placeholder="Enter code" ' +
+      'style="width:100%;height:44px;border-radius:10px;border:1px solid #2a3234;background:#12181a;color:#f2f3ee;padding:0 14px;font-size:18px;letter-spacing:.12em;text-align:center;margin-bottom:10px;box-sizing:border-box;" />' +
       '<button id="rc-auth-verify" style="width:100%;height:44px;border-radius:10px;border:none;background:#c8ff4d;color:#0d1406;font-weight:700;font-size:14px;">Verify &amp; sign in</button>' +
       '<div id="rc-auth-status-2" style="font-size:12px;color:#7c837b;margin-top:12px;min-height:16px;"></div>' +
       '<button id="rc-auth-resend" style="width:100%;margin-top:6px;background:none;border:none;color:#7c837b;font-size:12px;">Resend code</button>' +
