@@ -352,7 +352,7 @@ h1.screen{font-size:23px; font-weight:800; margin:6px 4px 14px;
 /* IMPORTANT: the storage key keeps its historical name so every byte of
    existing data survives the rename. Renaming the key = losing the data. */
 const STORE_KEY = "atlasos_v1";
-const VERSION   = "0.7.0";
+const VERSION   = "0.7.1";
 const CATS = ["chest","back","shoulders","arms","legs","abs","cardio","other"];
 const SKIP_REASONS = ["busy","pain","time","fatigue","other"];
 const CARDIO_TYPES = ["run","row","stair","other"];
@@ -609,7 +609,7 @@ function recordsFor(exId){
         if(!bestW || s.weightKg>bestW.v || (s.weightKg===bestW.v && s.reps>bestW.reps))
           bestW = {v:s.weightKg, reps:s.reps, date:sess.date};
         const ev = e1(s);
-        if(!bestE || ev>bestE.v) bestE = {v:ev, date:sess.date};
+        if(!bestE || ev>bestE.v) bestE = {v:ev, date:sess.date, w:s.weightKg, reps:s.reps};
       }
       if(vol>0 && (!bestV || vol>bestV.v)) bestV = {v:Math.round(vol), date:sess.date};
     }
@@ -721,7 +721,7 @@ function recentPRs(days){
   for(const ex of S.exercises){
     const rec = recordsFor(ex.id);
     if(rec.bestE && rec.bestE.date >= cutoff){
-      out.push({name:ex.name, date:rec.bestE.date, e1rm:rec.bestE.v});
+      out.push({name:ex.name, date:rec.bestE.date, e1rm:rec.bestE.v, w:rec.bestE.w, reps:rec.bestE.reps});
     }
   }
   return out.sort((a,b)=>b.date.localeCompare(a.date));
@@ -1698,7 +1698,8 @@ function AnalysisScreen(){
   if(prs.length){
     h += `<div class="note" style="margin-top:8px">Recent PRs</div>`;
     for(const p of prs.slice(0,5))
-      h += `<div class="factrow"><span>${esc(p.name)}</span><span class="factval">${p.e1rm} · ${shortDate(p.date)}</span></div>`;
+      h += `<div class="factrow"><span>${esc(p.name)}</span><span class="factval">${fmtW(p.w)}×${p.reps}
+        <span style="color:var(--muted); font-weight:400">(e1RM ${p.e1rm}) · ${shortDate(p.date)}</span></span></div>`;
   }
   h += `</div>`;
 
@@ -1922,18 +1923,21 @@ function prefillSets(exId, n){
 }
 
 /* Cascade: setting a weight/reps copies it forward to every LATER set in
-   the same exercise that isn't ticked yet — set 1 at 12.5 kg means sets
-   2–4 follow automatically. Ticked sets are never touched. */
+   the same exercise that hasn't been ticked OR manually edited yet — set 1
+   at 12.5 kg means sets 2–4 follow automatically. `locked` (set by bump/
+   setVal below) and `done` (set only by tick+RIR/checkAll) are deliberately
+   separate flags: editing a set's numbers must not mark it "done", or the
+   RIR picker gets skipped the first time you tap the tick afterward. */
 function cascade(ei, si, field, val){
   const sets = S.draft.entries[ei].sets;
   for(let j=si+1; j<sets.length; j++){
-    if(!sets[j].done) sets[j][field] = val;
+    if(!sets[j].done && !sets[j].locked) sets[j][field] = val;
   }
 }
 function bump(ei, si, field, amt){
   const s = S.draft.entries[ei].sets[si];
   s[field] = Math.max(0, Math.round((Number(s[field])+amt)*10)/10);
-  s.done = true;
+  s.locked = true;
   cascade(ei, si, field, s[field]);
   render();
 }
@@ -1941,7 +1945,7 @@ function setVal(ei, si, field, v){
   const s = S.draft.entries[ei].sets[si];
   const n = Number(v);
   s[field] = isNaN(n) ? s[field] : Math.max(0, n);
-  s.done = true;
+  s.locked = true;
   cascade(ei, si, field, s[field]);
   render();
 }
@@ -2190,6 +2194,4 @@ if(window.RepCheckCloud){
 </script>
 </body>
 </html>
-
-
 
