@@ -37,11 +37,25 @@
    e1RM/stall/volume calculations run exactly as they do today.
 
    AUTH
-   Single-user app, so this uses Supabase magic-link email — no
-   password to manage. On first load with no session, a small
+   Single-user app, so this uses Supabase email OTP — no password,
+   no link to follow. On first load with no session, a small
    full-screen overlay (styled to match Concept C) asks for an
-   email address, sends a sign-in link, and gets out of the way
-   once you're authenticated. Session persists across visits.
+   email address, emails a 6-digit code, and takes the code as
+   input right there in the same screen. This matters specifically
+   for the installed iOS PWA: a magic link opens in Mail/Safari's
+   in-app browser, a different storage context from the "Add to
+   Home Screen" app, so the installed app would never see the
+   session. Entering the code inside the app avoids that entirely.
+   Session persists across visits once verified.
+
+   REQUIRED ONE-TIME DASHBOARD STEP: Supabase decides whether an
+   email carries a clickable link or a 6-digit code purely from the
+   Magic Link template (Authentication > Email Templates in the
+   dashboard) — the signInWithOtp() call is identical either way.
+   The template must reference {{ .Token }} (e.g. "Your RepCheck
+   code is {{ .Token }}") for the code to actually appear in the
+   email. If the template only has {{ .ConfirmationURL }}, the code
+   below still works — the email API just won't show a code to type.
 
    SYNC MODEL
    - Push: full-array upsert per entity type, keyed by a client_id
@@ -100,26 +114,73 @@
       '<span style="width:5px;height:100%;background:#c8ff4d;display:block;border-radius:1px 1px 0 0;"></span>' +
       '<span style="font-size:16px;font-weight:700;margin-left:8px;">REPCHECK</span>' +
       "</div>" +
-      '<div style="font-size:13px;color:#9aa39c;margin-bottom:18px;line-height:1.5;">Sign in to sync your sessions to the cloud. Enter your email and we\'ll send a link — no password.</div>' +
-      '<input id="rc-auth-email" type="email" placeholder="you@example.com" ' +
+
+      '<div id="rc-auth-step-email">' +
+      '<div style="font-size:13px;color:#9aa39c;margin-bottom:18px;line-height:1.5;">Sign in to sync your sessions to the cloud. Enter your email and we\'ll send you a 6-digit code — no password, no link to follow.</div>' +
+      '<input id="rc-auth-email" type="email" inputmode="email" autocomplete="email" placeholder="you@example.com" ' +
       'style="width:100%;height:44px;border-radius:10px;border:1px solid #2a3234;background:#12181a;color:#f2f3ee;padding:0 14px;font-size:14px;margin-bottom:10px;box-sizing:border-box;" />' +
-      '<button id="rc-auth-send" style="width:100%;height:44px;border-radius:10px;border:none;background:#c8ff4d;color:#0d1406;font-weight:700;font-size:14px;">Send sign-in link</button>' +
-      '<div id="rc-auth-status" style="font-size:12px;color:#7c837b;margin-top:12px;min-height:16px;"></div>' +
+      '<button id="rc-auth-send" style="width:100%;height:44px;border-radius:10px;border:none;background:#c8ff4d;color:#0d1406;font-weight:700;font-size:14px;">Send code</button>' +
+      '<div id="rc-auth-status-1" style="font-size:12px;color:#7c837b;margin-top:12px;min-height:16px;"></div>' +
+      "</div>" +
+
+      '<div id="rc-auth-step-code" style="display:none;">' +
+      '<div style="font-size:13px;color:#9aa39c;margin-bottom:18px;line-height:1.5;">Enter the 6-digit code sent to <span id="rc-auth-email-echo" style="color:#f2f3ee;"></span>.</div>' +
+      '<input id="rc-auth-code" type="text" inputmode="numeric" pattern="[0-9]*" autocomplete="one-time-code" maxlength="6" placeholder="123456" ' +
+      'style="width:100%;height:44px;border-radius:10px;border:1px solid #2a3234;background:#12181a;color:#f2f3ee;padding:0 14px;font-size:18px;letter-spacing:.2em;text-align:center;margin-bottom:10px;box-sizing:border-box;" />' +
+      '<button id="rc-auth-verify" style="width:100%;height:44px;border-radius:10px;border:none;background:#c8ff4d;color:#0d1406;font-weight:700;font-size:14px;">Verify &amp; sign in</button>' +
+      '<div id="rc-auth-status-2" style="font-size:12px;color:#7c837b;margin-top:12px;min-height:16px;"></div>' +
+      '<button id="rc-auth-resend" style="width:100%;margin-top:6px;background:none;border:none;color:#7c837b;font-size:12px;">Resend code</button>' +
+      "</div>" +
+
       '<button id="rc-auth-skip" style="width:100%;margin-top:18px;background:none;border:none;color:#5a6058;font-size:11px;">Continue offline for now</button>' +
       "</div>";
     document.body.appendChild(div);
 
-    document.getElementById("rc-auth-send").onclick = async () => {
-      const email = document.getElementById("rc-auth-email").value.trim();
-      const status = document.getElementById("rc-auth-status");
-      if (!email) { status.textContent = "Enter an email address."; return; }
-      status.textContent = "Sending…";
-      const { error } = await getClient().auth.signInWithOtp({
-        email,
-        options: { emailRedirectTo: window.location.href },
-      });
-      status.textContent = error ? "Couldn't send that — try again." : "Check your email for the link.";
+    let pendingEmail = "";
+    const showStep = (step) => {
+      document.getElementById("rc-auth-step-email").style.display = step === "email" ? "block" : "none";
+      document.getElementById("rc-auth-step-code").style.display = step === "code" ? "block" : "none";
     };
+
+    async function sendCode() {
+      const email = document.getElementById("rc-auth-email").value.trim();
+      const status1 = document.getElementById("rc-auth-status-1");
+      if (!email) { status1.textContent = "Enter an email address."; return; }
+      status1.textContent = "Sending…";
+      const { error } = await getClient().auth.signInWithOtp({ email });
+      if (error) { status1.textContent = "Couldn't send that — try again."; return; }
+      pendingEmail = email;
+      document.getElementById("rc-auth-email-echo").textContent = email;
+      document.getElementById("rc-auth-status-2").textContent = "";
+      document.getElementById("rc-auth-code").value = "";
+      showStep("code");
+      document.getElementById("rc-auth-code").focus();
+    }
+
+    async function verifyCode() {
+      const token = document.getElementById("rc-auth-code").value.trim();
+      const status2 = document.getElementById("rc-auth-status-2");
+      if (!token) { status2.textContent = "Enter the code from your email."; return; }
+      status2.textContent = "Verifying…";
+      const { error } = await getClient().auth.verifyOtp({ email: pendingEmail, token, type: "email" });
+      // On success, onAuthStateChange (registered in init()) fires SIGNED_IN
+      // and hideAuthGate() removes this overlay — nothing else to do here.
+      if (error) status2.textContent = "That code didn't work — check it and try again.";
+    }
+
+    document.getElementById("rc-auth-send").onclick = sendCode;
+    document.getElementById("rc-auth-email").addEventListener("keydown", (e) => { if (e.key === "Enter") sendCode(); });
+
+    document.getElementById("rc-auth-verify").onclick = verifyCode;
+    document.getElementById("rc-auth-code").addEventListener("keydown", (e) => { if (e.key === "Enter") verifyCode(); });
+
+    document.getElementById("rc-auth-resend").onclick = async () => {
+      const status2 = document.getElementById("rc-auth-status-2");
+      status2.textContent = "Sending a new code…";
+      const { error } = await getClient().auth.signInWithOtp({ email: pendingEmail });
+      status2.textContent = error ? "Couldn't send that — try again." : "New code sent.";
+    };
+
     document.getElementById("rc-auth-skip").onclick = () => hideAuthGate();
   }
 
