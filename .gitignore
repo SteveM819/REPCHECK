@@ -1,0 +1,12 @@
+# Backups and personal data exports / dumps
+Backups/
+repcheck-export-*.json
+repcheck-supabase-dump-*.json
+
+# Secrets
+.env
+.env.*
+App password*
+
+# Dependencies
+node_modules/
